@@ -1,0 +1,63 @@
+name: ci
+on:
+  push:
+    branches:
+      - '*'
+  pull_request:
+    branches:
+      - '*'
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+
+      - name: checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: shellcheck
+        uses: ludeeus/action-shellcheck@1.0.0
+
+      - name: Setup go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.14
+
+      - name: Install tools
+        run: |
+          helm_version=v3.3.4-fossa.1
+          curl -fsSLO "https://github.com/fossas/helm-cli/releases/download/$helm_version/helm--linux-amd64.tar.gz"
+          sudo mkdir -p "/usr/local/helm-$helm_version"
+          sudo tar -xzf "helm--linux-amd64.tar.gz" -C "/usr/local/helm-$helm_version"
+          sudo rm -f /usr/local/bin/helm
+          sudo ln -s "/usr/local/helm-$helm_version/linux-amd64/helm" /usr/local/bin/helm
+
+          curl -LO https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl
+          chmod +x ./kubectl
+          sudo mv ./kubectl /usr/local/bin/kubectl
+
+          curl -fsSLo kind "https://github.com/kubernetes-sigs/kind/releases/download/v0.7.0/kind-linux-amd64"
+          chmod +x kind
+          sudo mv kind /usr/local/bin/kind
+
+          ./setup.sh
+
+      - name: Test
+        run: |
+          ./e2e-kind.sh
+
+      - name: Lint
+        run: |
+          go vet -v ./...
+          goimports -w -l .
+          go mod tidy
+          git diff --exit-code
+
+      - name: Build
+        run: |
+          set -o nounset
+          set -o pipefail
+
+          echo "Building snapshot..."
+          ./build.sh
