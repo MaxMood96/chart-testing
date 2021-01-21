@@ -41,8 +41,8 @@ dockers:
     skip_push: false
     dockerfile: Dockerfile
     image_templates:
-      - quay.io/helmpack/chart-testing:{{ .Tag }}
-      - quay.io/helmpack/chart-testing:latest
+      - quay.io/fossas/chart-testing:{{ .Tag }}
+      - quay.io/fossas/chart-testing:latest
     build_flag_templates:
       - --label=org.opencontainers.image.version={{ .Version }}
       - --label=org.opencontainers.image.revision={{ .Commit }}
@@ -51,7 +51,7 @@ dockers:
       - --label=org.opencontainers.image.description=ct - The chart testing tool
       - --label=org.opencontainers.image.vendor=Helm
       - --label=org.opencontainers.image.licenses=Apache-2.0
-      - --label=org.opencontainers.image.source=https://github.com/helm/chart-testing
+      - --label=org.opencontainers.image.source=https://github.com/fossas/chart-testing
       - --label=org.opencontainers.image.authors=The Helm Authors
     extra_files:
       - etc/chart_schema.yaml
