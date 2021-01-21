@@ -51,24 +51,27 @@ checksum:
   name_template: 'checksums.txt'
 
 snapshot:
-  version_template: "{{ .Tag }}-next"
-
-dockers_v2:
-  - images:
-      - "quay.io/helmpack/chart-testing"
-    tags:
-      - "{{ .Tag }}"
-      - "latest"
-    labels:
-      "org.opencontainers.image.version": "{{ .Version }}"
-      "org.opencontainers.image.revision": "{{ .Commit }}"
-      "org.opencontainers.image.title": "{{ .ProjectName }}"
-      "org.opencontainers.image.created": "{{ .Date }}"
-      "org.opencontainers.image.description": "ct - The chart testing tool"
-      "org.opencontainers.image.vendor": "Helm"
-      "org.opencontainers.image.licenses": "Apache-2.0"
-      "org.opencontainers.image.source": "https://github.com/helm/chart-testing"
-      "org.opencontainers.image.authors": "The Helm Authors"
+  name_template: "{{ .Tag }}-next"
+dockers:
+  - goos: linux
+    goarch: amd64
+    binaries:
+      - ct
+    skip_push: false
+    dockerfile: Dockerfile
+    image_templates:
+      - quay.io/fossas/chart-testing:{{ .Tag }}
+      - quay.io/fossas/chart-testing:latest
+    build_flag_templates:
+      - --label=org.opencontainers.image.version={{ .Version }}
+      - --label=org.opencontainers.image.revision={{ .Commit }}
+      - --label=org.opencontainers.image.title={{ .ProjectName }}
+      - --label=org.opencontainers.image.created={{ .Date }}
+      - --label=org.opencontainers.image.description=ct - The chart testing tool
+      - --label=org.opencontainers.image.vendor=Helm
+      - --label=org.opencontainers.image.licenses=Apache-2.0
+      - --label=org.opencontainers.image.source=https://github.com/fossas/chart-testing
+      - --label=org.opencontainers.image.authors=The Helm Authors
     extra_files:
       - etc/chart_schema.yaml
       - etc/lintconf.yaml
