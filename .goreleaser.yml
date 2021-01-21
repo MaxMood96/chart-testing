@@ -41,8 +41,8 @@ dockers:
     skip_push: false
     dockerfile: Dockerfile
     image_templates:
-      - quay.io/fossas/chart-testing:{{ .Tag }}
-      - quay.io/fossas/chart-testing:latest
+      - quay.io/fossa/chart-testing:{{ .Tag }}
+      - quay.io/fossa/chart-testing:latest
     build_flag_templates:
       - --label=org.opencontainers.image.version={{ .Version }}
       - --label=org.opencontainers.image.revision={{ .Commit }}
