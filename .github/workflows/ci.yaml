@@ -17,16 +17,16 @@ jobs:
           fetch-depth: 0
 
       - name: shellcheck
-        uses: ludeeus/action-shellcheck@1.0.0
+        uses: ludeeus/action-shellcheck@1.1.0
 
       - name: Setup go
         uses: actions/setup-go@v2
         with:
-          go-version: 1.14
+          go-version: 1.16
 
       - name: Install tools
         run: |
-          helm_version=v3.3.4-fossa.1
+          helm_version=v3.6.3-fossa.1
           curl -fsSLO "https://github.com/fossas/helm-cli/releases/download/$helm_version/helm--linux-amd64.tar.gz"
           sudo mkdir -p "/usr/local/helm-$helm_version"
           sudo tar -xzf "helm--linux-amd64.tar.gz" -C "/usr/local/helm-$helm_version"
