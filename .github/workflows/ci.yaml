@@ -126,6 +126,9 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
+      - name: Install FOSSA CLI
+        run: |
+          curl -H 'Cache-Control: no-cache' https://raw.githubusercontent.com/fossas/fossa-cli/master/install-latest.sh
       - name: Run dependency scan
         env:
           FOSSA_API_KEY: ${{ secrets.FOSSA_API_KEY }}
