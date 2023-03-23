@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - 'main'
+      - 'fossa'
   pull_request:
     branches:
       - '*'
