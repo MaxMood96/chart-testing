@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//go:build integration
 // +build integration
 
 package chart
@@ -20,6 +21,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/helm/chart-testing/v3/pkg/config"
 	"github.com/helm/chart-testing/v3/pkg/exec"
@@ -28,7 +30,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func newTestingHelmIntegration(cfg config.Configuration) Testing {
+func newTestingHelmIntegration(cfg config.Configuration, extraSetArgs string) Testing {
 	fakeMockLinter := new(fakeLinter)
 	procExec := exec.NewProcessExecutor(true)
 	extraArgs := strings.Fields(cfg.HelmExtraArgs)
@@ -36,11 +38,11 @@ func newTestingHelmIntegration(cfg config.Configuration) Testing {
 		config:           cfg,
 		directoryLister:  util.DirectoryLister{},
 		git:              fakeGit{},
-		chartUtils:       util.ChartUtils{},
+		utils:            util.Utils{},
 		accountValidator: fakeAccountValidator{},
 		linter:           fakeMockLinter,
-		helm:             tool.NewHelm(procExec, extraArgs),
-		kubectl:          tool.NewKubectl(procExec),
+		helm:             tool.NewHelm(procExec, extraArgs, strings.Fields(extraSetArgs)),
+		kubectl:          tool.NewKubectl(procExec, 30*time.Second),
 	}
 }
 
@@ -50,6 +52,7 @@ func TestInstallChart(t *testing.T) {
 		cfg      config.Configuration
 		chartDir string
 		output   TestResult
+		extraSet string
 	}
 
 	cases := []testCase{
@@ -62,6 +65,7 @@ func TestInstallChart(t *testing.T) {
 			},
 			"test_charts/must-pass-upgrade-install",
 			TestResult{mustNewChart("test_charts/must-pass-upgrade-install"), nil},
+			"",
 		},
 		{
 			"install only in random namespace",
@@ -70,12 +74,22 @@ func TestInstallChart(t *testing.T) {
 			},
 			"test_charts/must-pass-upgrade-install",
 			TestResult{mustNewChart("test_charts/must-pass-upgrade-install"), nil},
+			"",
+		},
+		{
+			"install with override set",
+			config.Configuration{
+				Debug: true,
+			},
+			"test_charts/must-pass-upgrade-install",
+			TestResult{mustNewChart("test_charts/must-pass-upgrade-install"), nil},
+			"--set=image.tag=latest",
 		},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			ct := newTestingHelmIntegration(tc.cfg)
+			ct := newTestingHelmIntegration(tc.cfg, tc.extraSet)
 			namespace := tc.cfg.Namespace
 			if namespace != "" {
 				ct.kubectl.CreateNamespace(namespace)
@@ -106,8 +120,8 @@ func TestUpgradeChart(t *testing.T) {
 		Debug:   true,
 		Upgrade: true,
 	}
-	ct := newTestingHelmIntegration(cfg)
-	processError := fmt.Errorf("Error waiting for process: exit status 1")
+	ct := newTestingHelmIntegration(cfg, "")
+	processError := fmt.Errorf("failed waiting for process: exit status 1")
 
 	cases := []testCase{
 		{
@@ -126,6 +140,12 @@ func TestUpgradeChart(t *testing.T) {
 			"change immutable statefulset.spec.volumeClaimTemplates field",
 			"test_charts/mutating-sfs-volumeclaim",
 			"test_charts/mutating-sfs-volumeclaim",
+			processError,
+		},
+		{
+			"change immutable deployment.spec.selector.matchLabels field",
+			"test_charts/simple-deployment",
+			"test_charts/simple-deployment-different-selector",
 			processError,
 		},
 	}

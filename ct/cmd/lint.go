@@ -85,10 +85,11 @@ func lint(cmd *cobra.Command, args []string) error {
 	}
 	configuration, err := config.LoadConfiguration(cfgFile, cmd, printConfig)
 	if err != nil {
-		return fmt.Errorf("Error loading configuration: %s", err)
+		return fmt.Errorf("failed loading configuration: %w", err)
 	}
 
-	testing, err := chart.NewTesting(*configuration)
+	emptyExtraSetArgs := ""
+	testing, err := chart.NewTesting(*configuration, emptyExtraSetArgs)
 	if err != nil {
 		return err
 	}
@@ -96,7 +97,7 @@ func lint(cmd *cobra.Command, args []string) error {
 	testing.PrintResults(results)
 
 	if err != nil {
-		return fmt.Errorf("Error linting charts: %s", err)
+		return fmt.Errorf("failed linting charts: %w", err)
 	}
 
 	fmt.Println("All charts linted successfully")

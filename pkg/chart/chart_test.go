@@ -21,7 +21,6 @@ import (
 
 	"github.com/helm/chart-testing/v3/pkg/config"
 	"github.com/helm/chart-testing/v3/pkg/util"
-	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -45,7 +44,11 @@ func (g fakeGit) ListChangedFilesInDirs(commit string, dirs ...string) ([]string
 		"test_charts/foo/Chart.yaml",
 		"test_charts/bar/Chart.yaml",
 		"test_charts/bar/bar_sub/templates/bar_sub.yaml",
+		"test_charts/excluded/Chart.yaml",
 		"test_chart_at_root/templates/foo.yaml",
+		"test_chart_at_multi_level/foo/bar/Chart.yaml",
+		"test_chart_at_multi_level/foo/baz/Chart.yaml",
+		"test_chart_at_multi_level/foo/excluded/Chart.yaml",
 		"some_non_chart_dir/some_non_chart_file",
 		"some_non_chart_file",
 	}, nil
@@ -59,7 +62,7 @@ func (g fakeGit) RemoveWorktree(path string) error {
 	return nil
 }
 
-func (g fakeGit) GetUrlForRemote(remote string) (string, error) {
+func (g fakeGit) GetURLForRemote(remote string) (string, error) {
 	return "git@github.com/helm/chart-testing", nil
 }
 
@@ -73,7 +76,7 @@ func (v fakeAccountValidator) Validate(repoDomain string, account string) error 
 	if strings.HasPrefix(account, "valid") {
 		return nil
 	}
-	return errors.New(fmt.Sprintf("Error validating account: %s", account))
+	return fmt.Errorf("failed validating account: %s", account)
 }
 
 type fakeLinter struct {
@@ -89,23 +92,29 @@ func (l *fakeLinter) Yamale(yamlFile, schemaFile string) error {
 	return nil
 }
 
-type fakeHelm struct{}
+type fakeHelm struct {
+	mock.Mock
+}
 
-func (h fakeHelm) AddRepo(name, url string, extraArgs []string) error   { return nil }
-func (h fakeHelm) BuildDependencies(chart string) error                 { return nil }
-func (h fakeHelm) LintWithValues(chart string, valuesFile string) error { return nil }
-func (h fakeHelm) InstallWithValues(chart string, valuesFile string, namespace string, release string) error {
+func (h *fakeHelm) AddRepo(name, url string, extraArgs []string) error { return nil }
+func (h *fakeHelm) BuildDependencies(chart string) error               { return nil }
+func (h *fakeHelm) BuildDependenciesWithArgs(chart string, extraArgs []string) error {
+	h.Called(chart, extraArgs)
 	return nil
 }
-func (h fakeHelm) Upgrade(chart string, namespace string, release string) error {
+func (h *fakeHelm) LintWithValues(chart string, valuesFile string) error { return nil }
+func (h *fakeHelm) InstallWithValues(chart string, valuesFile string, namespace string, release string) error {
 	return nil
 }
-func (h fakeHelm) Test(namespace string, release string) error {
+func (h *fakeHelm) Upgrade(chart string, namespace string, release string) error {
 	return nil
 }
-func (h fakeHelm) DeleteRelease(namespace string, release string) {}
+func (h *fakeHelm) Test(namespace string, release string) error {
+	return nil
+}
+func (h *fakeHelm) DeleteRelease(namespace string, release string) {}
 
-func (h fakeHelm) Version() (string, error) {
+func (h *fakeHelm) Version() (string, error) {
 	return "v3.0.0", nil
 }
 
@@ -135,10 +144,10 @@ func newTestingMock(cfg config.Configuration) Testing {
 		config:           cfg,
 		directoryLister:  util.DirectoryLister{},
 		git:              fakeGit{},
-		chartUtils:       util.ChartUtils{},
+		utils:            util.Utils{},
 		accountValidator: fakeAccountValidator{},
 		linter:           fakeMockLinter,
-		helm:             fakeHelm{},
+		helm:             new(fakeHelm),
 	}
 }
 
@@ -152,6 +161,21 @@ func TestComputeChangedChartDirectories(t *testing.T) {
 	assert.Nil(t, err)
 }
 
+func TestComputeChangedChartDirectoriesWithMultiLevelChart(t *testing.T) {
+	cfg := config.Configuration{
+		ExcludedCharts: []string{"excluded"},
+		ChartDirs:      []string{"test_chart_at_multi_level/foo"},
+	}
+	ct := newTestingMock(cfg)
+	actual, err := ct.ComputeChangedChartDirectories()
+	expected := []string{"test_chart_at_multi_level/foo/bar", "test_chart_at_multi_level/foo/baz"}
+	for _, chart := range actual {
+		assert.Contains(t, expected, chart)
+	}
+	assert.Len(t, actual, 2)
+	assert.Nil(t, err)
+}
+
 func TestReadAllChartDirectories(t *testing.T) {
 	actual, err := ct.ReadAllChartDirectories()
 	expected := []string{
@@ -159,13 +183,15 @@ func TestReadAllChartDirectories(t *testing.T) {
 		"test_charts/bar",
 		"test_charts/must-pass-upgrade-install",
 		"test_charts/mutating-deployment-selector",
+		"test_charts/simple-deployment",
+		"test_charts/simple-deployment-different-selector",
 		"test_charts/mutating-sfs-volumeclaim",
 		"test_chart_at_root",
 	}
 	for _, chart := range actual {
 		assert.Contains(t, expected, chart)
 	}
-	assert.Len(t, actual, 6)
+	assert.Len(t, actual, 8)
 	assert.Nil(t, err)
 }
 
@@ -272,7 +298,6 @@ func TestLintChartSchemaValidation(t *testing.T) {
 
 	runTests(true, 0, 1)
 	runTests(false, 0, 0)
-
 }
 
 func TestLintYamlValidation(t *testing.T) {
@@ -318,6 +343,29 @@ func TestLintYamlValidation(t *testing.T) {
 
 	runTests(true, 2, 0)
 	runTests(false, 0, 0)
+}
+
+func TestLintDependencyExtraArgs(t *testing.T) {
+	chart := "testdata/test_lints"
+	args := []string{"--skip-refresh"}
+
+	fakeMockHelm := new(fakeHelm)
+	ct.helm = fakeMockHelm
+	ct.config.HelmDependencyExtraArgs = args
+	ct.config.Charts = []string{chart}
+
+	t.Run("lint-helm-dependency-extra-args", func(t *testing.T) {
+		call := fakeMockHelm.On("BuildDependenciesWithArgs", chart, args).Return(nil)
+		call.Repeatability = 1
+
+		results, err := ct.LintCharts()
+		assert.Nil(t, err)
+		for _, result := range results {
+			assert.Nil(t, result.Error)
+		}
+		// -1 is set after Repeatability runs out
+		assert.Equal(t, -1, call.Repeatability)
+	})
 }
 
 func TestGenerateInstallConfig(t *testing.T) {

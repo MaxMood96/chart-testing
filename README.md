@@ -70,7 +70,7 @@ The following order of precedence applies:
 1. Config file
 
 Note that linting requires config file for [yamllint](https://github.com/adrienverge/yamllint) and [yamale](https://github.com/23andMe/Yamale).
-If not specified, these files are search in the current directory, `$HOME/.ct`, and `/etc/ct`, in that order.
+If not specified, these files are search in the current directory, the `.ct` directory in current directory, `$HOME/.ct`, and `/etc/ct`, in that order.
 Samples are provided in the [etc](etc) folder.
 
 ### Examples
@@ -79,7 +79,24 @@ The following example show various way of configuring the same thing:
 
 #### CLI
 
+#### Remote repo
+
+With remote repo:
+
     ct install --remote upstream --chart-dirs stable,incubator --build-id pr-42
+
+#### Local repo
+
+If you have a chart in current directory and ct installed on the host then you can run:
+
+    ct install --chart-dirs . --charts .
+
+With docker it works with:
+
+    docker run -it --network host --workdir=/data --volume ~/.kube/config:/root/.kube/config:ro --volume $(pwd):/data quay.io/helmpack/chart-testing:v3.7.1 ct install --chart-dirs . --charts .
+
+Notice that `workdir` param is important and must be the same as volume mounted.
+
 
 #### Environment Variables
 
@@ -176,7 +193,7 @@ Here's a previous one for reference: https://github.com/helm/chart-testing/pull/
 ### Create Release
 
 The release workflow is [dispatched from github actions](https://github.com/helm/chart-testing/actions)
-Versions must start with a lower-case `v`, e. g. `v3.4.0`.
+Versions must start with a lower-case `v`, e. g. `v3.7.1`.
 
 ## Supported versions
 

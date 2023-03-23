@@ -2,7 +2,7 @@ name: ci
 on:
   push:
     branches:
-      - '*'
+      - 'main'
   pull_request:
     branches:
       - '*'
@@ -12,34 +12,49 @@ jobs:
     steps:
 
       - name: checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@24cb9080177205b6e8c946b17badbe402adc938f # v3
         with:
           fetch-depth: 0
 
       - name: shellcheck
-        uses: ludeeus/action-shellcheck@1.1.0
+        uses: ludeeus/action-shellcheck@00cae500b08a931fb5698e11e79bfbd38e612a38 # v2.0.0
 
       - name: Setup go
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@4d34df0c2316fe8122ab82dc22947d607c0c91f9 # v3.3.0
         with:
-          go-version: 1.16
+          go-version-file: './go.mod'
+          check-latest: true
 
-      - name: Install tools
+      - name: Install Helm
         run: |
-          helm_version=v3.6.3-fossa.1
+          helm_version=v3.11.2-fossa.1
           curl -fsSLO "https://github.com/fossas/helm-cli/releases/download/$helm_version/helm--linux-amd64.tar.gz"
           sudo mkdir -p "/usr/local/helm-$helm_version"
           sudo tar -xzf "helm--linux-amd64.tar.gz" -C "/usr/local/helm-$helm_version"
           sudo rm -f /usr/local/bin/helm
           sudo ln -s "/usr/local/helm-$helm_version/linux-amd64/helm" /usr/local/bin/helm
 
+      - name: Install GoReleaser
+        uses: goreleaser/goreleaser-action@f82d6c1c344bcacabba2c841718984797f664a6b # v3.1.0
+        with:
+          install-only: true
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@c3667d99424e7e6047999fb6246c0da843953c65 # v2.6.0
+
+      - name: Install syft
+        uses: anchore/sbom-action/download-syft@448520c4f19577ffce70a8317e619089054687e3 # v0.13.4
+
+      - name: Install k8s Kind
+        uses: helm/kind-action@d8ccf8fb623ce1bb360ae2f45f323d9d5c5e9f00 # v1.3.0
+        with:
+          install_only: true
+
+      - name: Install tools
+        run: |
           curl -LO https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl
           chmod +x ./kubectl
           sudo mv ./kubectl /usr/local/bin/kubectl
-
-          curl -fsSLo kind "https://github.com/kubernetes-sigs/kind/releases/download/v0.11.1/kind-linux-amd64"
-          chmod +x kind
-          sudo mv kind /usr/local/bin/kind
 
           ./setup.sh
 
@@ -54,6 +69,12 @@ jobs:
           go mod tidy
           git diff --exit-code
 
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@e81a89b1732b9c48d79cd809d8d81d79c4647a18 # v2.0.0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@4b4e9c3e2d4531116a6f8ba8e71fc6e2cb6e6c8c # v2.0.0
+
       - name: Build
         run: |
           set -o nounset
@@ -61,3 +82,38 @@ jobs:
 
           echo "Building snapshot..."
           ./build.sh
+
+  check-docs:
+    name: check-docs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@24cb9080177205b6e8c946b17badbe402adc938f # v3
+      - uses: actions/setup-go@4d34df0c2316fe8122ab82dc22947d607c0c91f9 # v3
+        with:
+          go-version-file: './go.mod'
+          check-latest: true
+
+      - name: generate docs
+        run: |
+          go build -o ct-bin ./ct/main.go
+          ./ct-bin doc-gen
+          git_status="$(git status --porcelain)"
+          if [[ ${git_status} ]]; then
+              echo -e 'Documentation is outdated. Please update the docs\n'
+              echo "${git_status}"
+              exit 1
+          fi
+
+  golangci:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@24cb9080177205b6e8c946b17badbe402adc938f # v3
+      - uses: actions/setup-go@4d34df0c2316fe8122ab82dc22947d607c0c91f9 # v3
+        with:
+          go-version-file: './go.mod'
+          check-latest: true
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@08e2f20817b15149a52b5b3ebe7de50aff2ba8c5 # v3
+        with:
+          version: v1.51.0

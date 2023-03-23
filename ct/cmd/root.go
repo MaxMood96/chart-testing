@@ -49,6 +49,8 @@ func NewRootCmd() *cobra.Command {
 	cmd.AddCommand(newVersionCmd())
 	cmd.AddCommand(newGenerateDocsCmd())
 
+	cmd.DisableAutoGenTag = true
+
 	return cmd
 }
 
@@ -95,6 +97,8 @@ func addCommonLintAndInstallFlags(flags *pflag.FlagSet) {
 		specified on a per-repo basis with an equals sign as delimiter
 		(e.g. 'myrepo=--username test --password secret'). May be specified
 		multiple times or separate values with commas`))
+	flags.StringSlice("helm-dependency-extra-args", []string{}, heredoc.Doc(`
+		Additional arguments for 'helm dependency build' (e.g. ["--skip-refresh"]`))
 	flags.Bool("debug", false, heredoc.Doc(`
 		Print CLI calls of external tools to stdout (caution: setting this may
 		expose sensitive data when helm-repo-extra-args contains passwords)`))

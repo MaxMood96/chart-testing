@@ -18,6 +18,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
@@ -39,7 +40,7 @@ func loadAndAssertConfigFromFile(t *testing.T, configFile string) {
 
 	require.Equal(t, "origin", cfg.Remote)
 	require.Equal(t, "main", cfg.TargetBranch)
-	require.Equal(t, "pr-42", cfg.BuildId)
+	require.Equal(t, "pr-42", cfg.BuildID)
 	require.Equal(t, "my-lint-conf.yaml", cfg.LintConf)
 	require.Equal(t, "my-chart-yaml-schema.yaml", cfg.ChartYamlSchema)
 	require.Equal(t, true, cfg.ValidateMaintainers)
@@ -57,6 +58,8 @@ func loadAndAssertConfigFromFile(t *testing.T, configFile string) {
 	require.Equal(t, "default", cfg.Namespace)
 	require.Equal(t, "release", cfg.ReleaseLabel)
 	require.Equal(t, true, cfg.ExcludeDeprecated)
+	require.Equal(t, 120*time.Second, cfg.KubectlTimeout)
+	require.Equal(t, true, cfg.SkipCleanUp)
 }
 
 func Test_findConfigFile(t *testing.T) {

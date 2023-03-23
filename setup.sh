@@ -14,5 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-go install github.com/goreleaser/goreleaser
-go install golang.org/x/tools/cmd/goimports
+set -o errexit
+
+go install golang.org/x/tools/cmd/goimports@latest

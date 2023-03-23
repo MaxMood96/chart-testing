@@ -63,7 +63,7 @@ func addInstallFlags(flags *flag.FlagSet) {
 		the ID of a pull request. If not specified, the name of the chart is used`))
 	flags.String("helm-extra-args", "", heredoc.Doc(`
 		Additional arguments for Helm. Must be passed as a single quoted string
-		(e.g. "--timeout 500"`))
+		(e.g. "--timeout 500s"`))
 	flags.Bool("upgrade", false, heredoc.Doc(`
 		Whether to test an in-place upgrade of each chart from its previous revision if the
 		current version should not introduce a breaking change according to the SemVer spec`))
@@ -77,6 +77,11 @@ func addInstallFlags(flags *flag.FlagSet) {
 	flags.String("release-label", "app.kubernetes.io/instance", heredoc.Doc(`
 		The label to be used as a selector when inspecting resources created by charts.
 		This is only used if namespace is specified`))
+	flags.String("helm-extra-set-args", "", heredoc.Doc(`
+		Additional arguments for Helm. Must be passed as a single quoted string
+		(e.g. "--set=name=value"`))
+	flags.Bool("skip-clean-up", false, heredoc.Doc(`
+		Skip resources clean-up. Used if need to continue other flows or keep it around.`))
 }
 
 func install(cmd *cobra.Command, args []string) error {
@@ -88,10 +93,14 @@ func install(cmd *cobra.Command, args []string) error {
 	}
 	configuration, err := config.LoadConfiguration(cfgFile, cmd, printConfig)
 	if err != nil {
-		return fmt.Errorf("Error loading configuration: %s", err)
+		return fmt.Errorf("failed loading configuration: %w", err)
 	}
 
-	testing, err := chart.NewTesting(*configuration)
+	extraSetArgs, err := cmd.Flags().GetString("helm-extra-set-args")
+	if err != nil {
+		return err
+	}
+	testing, err := chart.NewTesting(*configuration, extraSetArgs)
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -99,7 +108,7 @@ func install(cmd *cobra.Command, args []string) error {
 	testing.PrintResults(results)
 
 	if err != nil {
-		return fmt.Errorf("Error installing charts: %s", err)
+		return fmt.Errorf("failed installing charts: %w", err)
 	}
 
 	fmt.Println("All charts installed successfully")

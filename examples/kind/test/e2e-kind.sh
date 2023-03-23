@@ -4,10 +4,10 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-readonly CT_VERSION=v3.4.0
-readonly KIND_VERSION=v0.7.0
+readonly CT_VERSION=v3.7.1
+readonly KIND_VERSION=v0.12.0
 readonly CLUSTER_NAME=chart-testing
-readonly K8S_VERSION=v1.17.0
+readonly K8S_VERSION=v1.22.7
 
 run_ct_container() {
     echo 'Running ct container...'
@@ -41,7 +41,8 @@ create_kind_cluster() {
     kind create cluster --name "$CLUSTER_NAME" --config test/kind-config.yaml --image "kindest/node:$K8S_VERSION" --wait 60s
 
     echo 'Copying kubeconfig to container...'
-    docker cp /root/.kube/config ct:/root/.kube/config
+    docker_exec mkdir /root/.kube
+    docker cp /root/.kube/kind-config ct:/root/.kube/config
 
     docker_exec kubectl cluster-info
     echo
