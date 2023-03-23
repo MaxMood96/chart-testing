@@ -40,7 +40,7 @@ RUN targetArch=$(echo $TARGETPLATFORM | cut -f2 -d '/') \
     fi \
     && curl -LO "https://github.com/fossas/helm-cli/releases/download/$helm_version/helm--$HELM_ARCH.tar.gz" \
     && mkdir -p "/usr/local/helm-$helm_version" \
-    && tar -xzf "helm-$helm_version-$HELM_ARCH.tar.gz" -C "/usr/local/helm-$helm_version" \
+    && tar -xzf "helm--$HELM_ARCH.tar.gz" -C "/usr/local/helm-$helm_version" \
     && ln -s "/usr/local/helm-$helm_version/$HELM_ARCH/helm" /usr/local/bin/helm \
     && rm -f "helm-$helm_version-$HELM_ARCH.tar.gz"
 
