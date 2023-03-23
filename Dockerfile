@@ -33,11 +33,17 @@ fi \
 # Install Helm
 ARG helm_version=v3.16.4-fossa.1
 LABEL helm_version=$helm_version
-RUN curl -LO "https://github.com/fossas/helm-cli/releases/download/$helm_version/helm--linux-amd64.tar.gz" && \
-    mkdir -p "/usr/local/helm-$helm_version" && \
-    tar -xzf "helm--linux-amd64.tar.gz" -C "/usr/local/helm-$helm_version" && \
-    ln -s "/usr/local/helm-$helm_version/linux-amd64/helm" /usr/local/bin/helm && \
-    rm -f "helm-$helm_version-linux-amd64.tar.gz"
+RUN targetArch=$(echo $TARGETPLATFORM | cut -f2 -d '/') \
+    && if [ ${targetArch} = "amd64" ]; then \
+    HELM_ARCH="linux-amd64"; \
+elif [ ${targetArch} = "arm64" ]; then \
+    HELM_ARCH="linux-arm64"; \
+fi \
+    && curl -LO "https://github.com/fossas/helm-cli/releases/download/$helm_version/helm--$HELM_ARCH.tar.gz" \
+    && mkdir -p "/usr/local/helm-$helm_version" \
+    && tar -xzf "helm--$HELM_ARCH.tar.gz" -C "/usr/local/helm-$helm_version" \
+    && ln -s "/usr/local/helm-$helm_version/$HELM_ARCH/helm" /usr/local/bin/helm \
+    && rm -f "helm--$HELM_ARCH.tar.gz"
 
 COPY ./etc/chart_schema.yaml /etc/ct/chart_schema.yaml
 COPY ./etc/lintconf.yaml /etc/ct/lintconf.yaml
