@@ -1,3 +1,11 @@
+# fossas/helm-cli
+
+This is a fork of [chart-testing](https://github.com/helm/chart-testing) that we use as part of our CI for our Helm charts. The only difference from the upstream version is that it uses our modified [Helm CLI](https://github.com/fossas/helm-cli).
+
+Original README is preserved below.
+
+---
+
 # Chart Testing
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
@@ -15,11 +23,11 @@ It automatically detects charts changed against the target branch.
 It is recommended to use the provided Docker image which can be [found on Quay](https://quay.io/helmpack/chart-testing/).
 It comes with all necessary tools installed.
 
-* [Helm](http://helm.sh)
-* [Git](https://git-scm.com) (2.17.0 or later)
-* [Yamllint](https://github.com/adrienverge/yamllint)
-* [Yamale](https://github.com/23andMe/Yamale)
-* [Kubectl](https://kubernetes.io/docs/reference/kubectl/overview/)
+-   [Helm](http://helm.sh)
+-   [Git](https://git-scm.com) (2.17.0 or later)
+-   [Yamllint](https://github.com/adrienverge/yamllint)
+-   [Yamale](https://github.com/23andMe/Yamale)
+-   [Kubectl](https://kubernetes.io/docs/reference/kubectl/overview/)
 
 ### Binary Distribution
 
@@ -44,16 +52,16 @@ $ brew install chart-testing
 
 See documentation for individual commands:
 
-* [ct](doc/ct.md)
-* [ct install](doc/ct_install.md)
-* [ct lint](doc/ct_lint.md)
-* [ct lint-and-install](doc/ct_lint-and-install.md)
-* [ct list-changed](doc/ct_list-changed.md)
-* [ct version](doc/ct_version.md)
+-   [ct](doc/ct.md)
+-   [ct install](doc/ct_install.md)
+-   [ct lint](doc/ct_lint.md)
+-   [ct lint-and-install](doc/ct_lint-and-install.md)
+-   [ct list-changed](doc/ct_list-changed.md)
+-   [ct version](doc/ct_version.md)
 
 For a more extensive how-to guide, please see:
 
-* [charts-repo-actions-demo](https://github.com/helm/charts-repo-actions-demo)
+-   [charts-repo-actions-demo](https://github.com/helm/charts-repo-actions-demo)
 
 ## Configuration
 
@@ -97,7 +105,6 @@ With docker it works with:
 
 Notice that `workdir` param is important and must be the same as volume mounted.
 
-
 #### Environment Variables
 
     export CT_REMOTE=upstream
@@ -113,8 +120,8 @@ Notice that `workdir` param is important and must be the same as volume mounted.
 ```yaml
 remote: upstream
 chart-dirs:
-  - stable
-  - incubator
+    - stable
+    - incubator
 build-id: pr-42
 ```
 
@@ -122,11 +129,9 @@ build-id: pr-42
 
     ct install --config config.yaml
 
-
 `ct` supports any format [Viper](https://github.com/spf13/viper) can read, i. e. JSON, TOML, YAML, HCL, and Java properties files.
 
 Notice that if no config file is specified, then `ct.yaml` (or any of the supported formats) is loaded from the current directory, `$HOME/.ct`, or `/etc/ct`, in that order, if found.
-
 
 #### Using private chart repositories
 
@@ -137,11 +142,11 @@ This could for example be used to authenticate a private chart repository.
 
 ```yaml
 chart-repos:
-  - incubator=https://incubator.io
-  - basic-auth=https://private.com
-  - ssl-repo=https://self-signed.ca
+    - incubator=https://incubator.io
+    - basic-auth=https://private.com
+    - ssl-repo=https://self-signed.ca
 helm-repo-extra-args:
-  - ssl-repo=--ca-file ./my-ca.crt
+    - ssl-repo=--ca-file ./my-ca.crt
 ```
 
     ct install --config config.yaml --helm-repo-extra-args "basic-auth=--username user --password secret"
