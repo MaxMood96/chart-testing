@@ -77,6 +77,8 @@ jobs:
       - name: Build
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COSIGN_EXPERIMENTAL: "true"
+          COSIGN_YES: "true"
         run: |
           set -o nounset
           set -o pipefail
