@@ -1,4 +1,4 @@
-# fossas/helm-cli
+# fossas/chart-testing
 
 This is a fork of [chart-testing](https://github.com/helm/chart-testing) that we use as part of our CI for our Helm charts. The only difference from the upstream version is that it uses our modified [Helm CLI](https://github.com/fossas/helm-cli).
 
