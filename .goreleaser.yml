@@ -53,8 +53,8 @@ dockers:
     use: buildx
     dockerfile: Dockerfile
     image_templates:
-      - quay.io/fossa/chart-testing:{{ .Tag }}
-      - quay.io/fossa/chart-testing:latest
+      - quay.io/fossa/chart-testing:{{ .Tag }}-amd64
+      - quay.io/fossa/chart-testing:latest-amd64
     build_flag_templates:
       - --platform=linux/amd64
       - --label=org.opencontainers.image.version={{ .Version }}
@@ -74,8 +74,8 @@ dockers:
     use: buildx
     dockerfile: Dockerfile
     image_templates:
-      - quay.io/helmpack/chart-testing:{{ .Tag }}-arm64
-      - quay.io/helmpack/chart-testing:latest-arm64
+      - quay.io/fossa/chart-testing:{{ .Tag }}-arm64
+      - quay.io/fossa/chart-testing:latest-arm64
     build_flag_templates:
       - --platform=linux/arm64
       - --label=org.opencontainers.image.version={{ .Version }}
@@ -85,21 +85,21 @@ dockers:
       - --label=org.opencontainers.image.description=ct - The chart testing tool
       - --label=org.opencontainers.image.vendor=Helm
       - --label=org.opencontainers.image.licenses=Apache-2.0
-      - --label=org.opencontainers.image.source=https://github.com/helm/chart-testing
+      - --label=org.opencontainers.image.source=https://github.com/fossas/chart-testing
       - --label=org.opencontainers.image.authors=The Helm Authors
     extra_files:
       - etc/chart_schema.yaml
       - etc/lintconf.yaml
 
 docker_manifests:
-- name_template: quay.io/helmpack/chart-testing:latest
+- name_template: quay.io/fossa/chart-testing:latest
   image_templates:
-  - quay.io/helmpack/chart-testing:latest-amd64
-  - quay.io/helmpack/chart-testing:latest-arm64
-- name_template: quay.io/helmpack/chart-testing:{{ .Tag }}
+  - quay.io/fossa/chart-testing:latest-amd64
+  - quay.io/fossa/chart-testing:latest-arm64
+- name_template: quay.io/fossa/chart-testing:{{ .Tag }}
   image_templates:
-  - quay.io/helmpack/chart-testing:{{ .Tag }}-amd64
-  - quay.io/helmpack/chart-testing:{{ .Tag }}-arm64
+  - quay.io/fossa/chart-testing:{{ .Tag }}-amd64
+  - quay.io/fossa/chart-testing:{{ .Tag }}-arm64
 
 signs:
   - id: all
