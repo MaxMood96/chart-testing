@@ -1,14 +1,14 @@
 project_name: chart-testing
 
 env:
-  - COSIGN_EXPERIMENTAL=true
+  - COSIGN_YES=true
 
 before:
   hooks:
     - go mod download
 
 sboms:
-- artifacts: archive
+  - artifacts: archive
 
 builds:
   - main: ct/main.go
@@ -33,7 +33,8 @@ builds:
         -X github.com/helm/chart-testing/v3/ct/cmd.BuildDate={{ .Date }}
 
 archives:
-  - format_overrides:
+  - rlcp: true
+    format_overrides:
       - goos: windows
         format: zip
     files:
@@ -92,14 +93,14 @@ dockers:
       - etc/lintconf.yaml
 
 docker_manifests:
-- name_template: quay.io/fossa/chart-testing:latest
-  image_templates:
-  - quay.io/fossa/chart-testing:latest-amd64
-  - quay.io/fossa/chart-testing:latest-arm64
-- name_template: quay.io/fossa/chart-testing:{{ .Tag }}
-  image_templates:
-  - quay.io/fossa/chart-testing:{{ .Tag }}-amd64
-  - quay.io/fossa/chart-testing:{{ .Tag }}-arm64
+  - name_template: quay.io/fossa/chart-testing:latest
+    image_templates:
+      - quay.io/fossa/chart-testing:latest-amd64
+      - quay.io/fossa/chart-testing:latest-arm64
+  - name_template: quay.io/fossa/chart-testing:{{ .Tag }}
+    image_templates:
+      - quay.io/fossa/chart-testing:{{ .Tag }}-amd64
+      - quay.io/fossa/chart-testing:{{ .Tag }}-arm64
 
 signs:
   - id: all
@@ -114,3 +115,6 @@ docker_signs:
     cmd: cosign
     args: ["sign", "${artifact}"]
     artifacts: manifests
+
+changelog:
+  use: github-native

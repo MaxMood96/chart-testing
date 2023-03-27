@@ -42,10 +42,11 @@ RUN targetArch=$(echo $TARGETPLATFORM | cut -f2 -d '/') \
     && mkdir -p "/usr/local/helm-$helm_version" \
     && tar -xzf "helm--$HELM_ARCH.tar.gz" -C "/usr/local/helm-$helm_version" \
     && ln -s "/usr/local/helm-$helm_version/$HELM_ARCH/helm" /usr/local/bin/helm \
-    && rm -f "helm-$helm_version-$HELM_ARCH.tar.gz"
+    && rm -f "helm--$HELM_ARCH.tar.gz"
 
 COPY ./etc/chart_schema.yaml /etc/ct/chart_schema.yaml
 COPY ./etc/lintconf.yaml /etc/ct/lintconf.yaml
 COPY ct /usr/local/bin/ct
+RUN git config --global --add safe.directory /workdir
 # Ensure that the binary is available on path and is executable
 RUN ct --help
