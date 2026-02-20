@@ -18,7 +18,7 @@ RUN pip install --break-system-packages "yamale==$yamale_version"
 
 ARG TARGETPLATFORM
 # Install kubectl
-ARG kubectl_version=v1.32.0
+ARG kubectl_version=v1.34.4
 LABEL kubectl-version=$kubectl_version
 RUN targetArch=$(echo $TARGETPLATFORM | cut -f2 -d '/') \
     && if [ ${targetArch} = "amd64" ]; then \
