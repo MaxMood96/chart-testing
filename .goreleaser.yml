@@ -53,10 +53,7 @@ checksum:
 snapshot:
   name_template: "{{ .Tag }}-next"
 dockers:
-  - goos: linux
-    goarch: amd64
-    binaries:
-      - ct
+  - goarch: amd64
     skip_push: false
     dockerfile: Dockerfile
     image_templates:
