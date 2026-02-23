@@ -31,7 +31,7 @@ fi \
     && mv kubectl /usr/local/bin/
 
 # Install Helm
-ARG helm_version=v3.16.4-fossa.1
+ARG helm_version=v3.20.0-fossa.1
 LABEL helm_version=$helm_version
 RUN targetArch=$(echo $TARGETPLATFORM | cut -f2 -d '/') \
     && if [ ${targetArch} = "amd64" ]; then \
