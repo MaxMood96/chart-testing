@@ -31,15 +31,16 @@ fi \
     && mv kubectl /usr/local/bin/
 
 # Install Helm
+ARG helm_tag=v3.20.0-fossa.1
 ARG helm_version=v3.20.0-fossa
-LABEL helm_version=$helm_version
+LABEL helm_version=$helm_tag
 RUN targetArch=$(echo $TARGETPLATFORM | cut -f2 -d '/') \
     && if [ ${targetArch} = "amd64" ]; then \
     HELM_ARCH="linux-amd64"; \
 elif [ ${targetArch} = "arm64" ]; then \
     HELM_ARCH="linux-arm64"; \
 fi \
-    && curl -LO "https://github.com/fossas/helm-cli/releases/download/$helm_version/helm-$helm_version-$HELM_ARCH.tar.gz" \
+    && curl -LO "https://github.com/fossas/helm-cli/releases/download/$helm_tag/helm-$helm_version-$HELM_ARCH.tar.gz" \
     && mkdir -p "/usr/local/helm-$helm_version" \
     && tar -xzf "helm-$helm_version-$HELM_ARCH.tar.gz" -C "/usr/local/helm-$helm_version" \
     && ln -s "/usr/local/helm-$helm_version/$HELM_ARCH/helm" /usr/local/bin/helm \
