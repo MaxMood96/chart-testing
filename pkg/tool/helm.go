@@ -16,25 +16,35 @@ package tool
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/helm/chart-testing/v3/pkg/exec"
 )
 
 type Helm struct {
-	exec         exec.ProcessExecutor
-	extraArgs    []string
-	extraSetArgs []string
+	exec          exec.ProcessExecutor
+	extraArgs     []string
+	lintExtraArgs []string
+	extraSetArgs  []string
 }
 
-func NewHelm(exec exec.ProcessExecutor, extraArgs []string, extraSetArgs []string) Helm {
+func NewHelm(exec exec.ProcessExecutor, extraArgs, lintExtraArgs, extraSetArgs []string) Helm {
 	return Helm{
-		exec:         exec,
-		extraArgs:    extraArgs,
-		extraSetArgs: extraSetArgs,
+		exec:          exec,
+		extraArgs:     extraArgs,
+		lintExtraArgs: lintExtraArgs,
+		extraSetArgs:  extraSetArgs,
 	}
 }
 
 func (h Helm) AddRepo(name string, url string, extraArgs []string) error {
+	const ociPrefix string = "oci://"
+
+	if strings.HasPrefix(url, ociPrefix) {
+		registryDomain := url[len(ociPrefix):]
+		return h.exec.RunProcess("helm", "registry", "login", registryDomain, extraArgs)
+	}
+
 	return h.exec.RunProcess("helm", "repo", "add", name, url, extraArgs)
 }
 
@@ -52,7 +62,7 @@ func (h Helm) LintWithValues(chart string, valuesFile string) error {
 		values = []string{"--values", valuesFile}
 	}
 
-	return h.exec.RunProcess("helm", "lint", chart, values)
+	return h.exec.RunProcess("helm", "lint", chart, values, h.lintExtraArgs)
 }
 
 func (h Helm) InstallWithValues(chart string, valuesFile string, namespace string, release string) error {
@@ -65,9 +75,14 @@ func (h Helm) InstallWithValues(chart string, valuesFile string, namespace strin
 		"--wait", values, h.extraArgs, h.extraSetArgs)
 }
 
-func (h Helm) Upgrade(chart string, namespace string, release string) error {
+func (h Helm) UpgradeWithValues(chart string, valuesFile string, namespace string, release string) error {
+	var values []string
+	if valuesFile != "" {
+		values = []string{"--values", valuesFile}
+	}
+
 	return h.exec.RunProcess("helm", "upgrade", release, chart, "--namespace", namespace,
-		"--reuse-values", "--wait", h.extraArgs, h.extraSetArgs)
+		"--wait", values, h.extraArgs, h.extraSetArgs)
 }
 
 func (h Helm) Test(namespace string, release string) error {
@@ -76,7 +91,7 @@ func (h Helm) Test(namespace string, release string) error {
 
 func (h Helm) DeleteRelease(namespace string, release string) {
 	fmt.Printf("Deleting release %q...\n", release)
-	if err := h.exec.RunProcess("helm", "uninstall", release, "--namespace", namespace, h.extraArgs); err != nil {
+	if err := h.exec.RunProcess("helm", "uninstall", release, "--namespace", namespace, "--wait", h.extraArgs); err != nil {
 		fmt.Println("Error deleting Helm release:", err)
 	}
 }

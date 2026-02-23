@@ -22,9 +22,11 @@ import (
 	"strings"
 
 	"github.com/Masterminds/semver"
+	helmignore "helm.sh/helm/v3/pkg/ignore"
 
 	"github.com/helm/chart-testing/v3/pkg/config"
 	"github.com/helm/chart-testing/v3/pkg/exec"
+	"github.com/helm/chart-testing/v3/pkg/ignore"
 	"github.com/helm/chart-testing/v3/pkg/tool"
 	"github.com/helm/chart-testing/v3/pkg/util"
 )
@@ -49,6 +51,8 @@ const maxNameLength = 63
 //
 // ValidateRepository checks that the current working directory is a valid git repository,
 // and returns nil if valid.
+//
+// BranchExists checks whether a given branch exists in the git repository.
 type Git interface {
 	FileExistsOnBranch(file string, remote string, branch string) bool
 	Show(file string, remote string, branch string) (string, error)
@@ -58,6 +62,7 @@ type Git interface {
 	ListChangedFilesInDirs(commit string, dirs ...string) ([]string, error)
 	GetURLForRemote(remote string) (string, error)
 	ValidateRepository() error
+	BranchExists(branch string) bool
 }
 
 // Helm is the interface that wraps Helm operations
@@ -74,7 +79,8 @@ type Git interface {
 // InstallWithValues runs `helm install` for the given chart using the specified values file.
 // Pass a zero value for valuesFile in order to run install without specifying a values file.
 //
-// Upgrade runs `helm upgrade` against an existing release, and re-uses the previously computed values.
+// UpgradeWithValues runs `helm upgrade` against an existing release using the specified values file.
+// Pass a zero value for valuesFile in order to run install without specifying a values file.
 //
 // Test runs `helm test` against an existing release. Set the cleanup argument to true in order
 // to clean up test pods created by helm after the test command completes.
@@ -86,7 +92,7 @@ type Helm interface {
 	BuildDependenciesWithArgs(chart string, extraArgs []string) error
 	LintWithValues(chart string, valuesFile string) error
 	InstallWithValues(chart string, valuesFile string, namespace string, release string) error
-	Upgrade(chart string, namespace string, release string) error
+	UpgradeWithValues(chart string, valuesFile string, namespace string, release string) error
 	Test(namespace string, release string) error
 	DeleteRelease(namespace string, release string)
 	Version() (string, error)
@@ -200,12 +206,17 @@ func (c *Chart) HasCIValuesFile(path string) bool {
 }
 
 // CreateInstallParams generates a randomized release name and namespace based on the chart path
-// and optional buildID. If a buildID is specified, it will be part of the generated namespace.
-func (c *Chart) CreateInstallParams(buildID string) (release string, namespace string) {
+// and optional buildID. If release_name is specified, the release name is set to that string instead.
+// If a buildID is specified, it will be part of the generated namespace.
+func (c *Chart) CreateInstallParams(buildID string, releaseName string) (release string, namespace string) {
 	release = filepath.Base(c.Path())
 	if release == "." || release == "/" {
-		yaml := c.Yaml()
-		release = yaml.Name
+		if releaseName != "" {
+			release = releaseName
+		} else {
+			yaml := c.Yaml()
+			release = yaml.Name
+		}
 	}
 	namespace = release
 	if buildID != "" {
@@ -239,6 +250,7 @@ type Testing struct {
 	directoryLister          DirectoryLister
 	utils                    Utils
 	previousRevisionWorktree string
+	loadRules                func(string) (*helmignore.Rules, error)
 }
 
 // TestResults holds results and overall status
@@ -254,13 +266,15 @@ type TestResult struct {
 }
 
 // NewTesting creates a new Testing struct with the given config.
-func NewTesting(config config.Configuration, extraSetArgs string) (Testing, error) {
+func NewTesting(config config.Configuration) (Testing, error) {
 	procExec := exec.NewProcessExecutor(config.Debug)
-	extraArgs := strings.Fields(config.HelmExtraArgs)
+	helmExtraArgs := strings.Fields(config.HelmExtraArgs)
+	helmExtraSetArgs := strings.Fields(config.HelmExtraSetArgs)
+	helmLintExtraArgs := strings.Fields(config.HelmLintExtraArgs)
 
 	testing := Testing{
 		config:           config,
-		helm:             tool.NewHelm(procExec, extraArgs, strings.Fields(extraSetArgs)),
+		helm:             tool.NewHelm(procExec, helmExtraArgs, helmLintExtraArgs, helmExtraSetArgs),
 		git:              tool.NewGit(procExec),
 		kubectl:          tool.NewKubectl(procExec, config.KubectlTimeout),
 		linter:           tool.NewLinter(procExec),
@@ -268,6 +282,7 @@ func NewTesting(config config.Configuration, extraSetArgs string) (Testing, erro
 		accountValidator: tool.AccountValidator{},
 		directoryLister:  util.DirectoryLister{},
 		utils:            util.Utils{},
+		loadRules:        ignore.LoadRules,
 	}
 
 	versionString, err := testing.helm.Version()
@@ -315,15 +330,23 @@ func (t *Testing) processCharts(action func(chart *Chart) TestResult) ([]TestRes
 		}
 	}
 
-	fmt.Println()
-	util.PrintDelimiterLineToWriter(os.Stdout, "-")
-	fmt.Println(" Charts to be processed:")
-	util.PrintDelimiterLineToWriter(os.Stdout, "-")
+	if !t.config.GithubGroups {
+		fmt.Println()
+		util.PrintDelimiterLineToWriter(os.Stdout, "-")
+		fmt.Println(" Charts to be processed:")
+		util.PrintDelimiterLineToWriter(os.Stdout, "-")
+	} else {
+		util.GithubGroupsBegin(os.Stdout, "Charts to be processed")
+	}
 	for _, chart := range charts {
 		fmt.Printf(" %s\n", chart)
 	}
-	util.PrintDelimiterLineToWriter(os.Stdout, "-")
-	fmt.Println()
+	if !t.config.GithubGroups {
+		util.PrintDelimiterLineToWriter(os.Stdout, "-")
+		fmt.Println()
+	} else {
+		util.GithubGroupsEnd(os.Stdout)
+	}
 
 	repoArgs := map[string][]string{}
 
@@ -357,7 +380,7 @@ func (t *Testing) processCharts(action func(chart *Chart) TestResult) ([]TestRes
 			return results, fmt.Errorf("failed identifying merge base: %w", err)
 		}
 		// Add worktree for the target revision
-		worktreePath, err := os.MkdirTemp("./", "ct_previous_revision")
+		worktreePath, err := os.MkdirTemp("./", "ct-previous-revision")
 		if err != nil {
 			return results, fmt.Errorf("could not create previous revision directory: %w", err)
 		}
@@ -368,17 +391,21 @@ func (t *Testing) processCharts(action func(chart *Chart) TestResult) ([]TestRes
 		}
 		defer t.git.RemoveWorktree(worktreePath) // nolint: errcheck
 
-		for _, chart := range charts {
-			if err := t.helm.BuildDependenciesWithArgs(t.computePreviousRevisionPath(chart.Path()), t.config.HelmDependencyExtraArgs); err != nil {
-				// Only print error (don't exit) if building dependencies for previous revision fails.
-				fmt.Printf("failed building dependencies for previous revision of chart %q: %v\n", chart, err.Error())
+		if !t.config.SkipHelmDependencies {
+			for _, chart := range charts {
+				if err := t.helm.BuildDependenciesWithArgs(t.computePreviousRevisionPath(chart.Path()), t.config.HelmDependencyExtraArgs); err != nil {
+					// Only print error (don't exit) if building dependencies for previous revision fails.
+					fmt.Printf("failed building dependencies for previous revision of chart %q: %v\n", chart, err.Error())
+				}
 			}
 		}
 	}
 
 	for _, chart := range charts {
-		if err := t.helm.BuildDependenciesWithArgs(chart.Path(), t.config.HelmDependencyExtraArgs); err != nil {
-			return nil, fmt.Errorf("failed building dependencies for chart %q: %w", chart, err)
+		if !t.config.SkipHelmDependencies {
+			if err := t.helm.BuildDependenciesWithArgs(chart.Path(), t.config.HelmDependencyExtraArgs); err != nil {
+				return nil, fmt.Errorf("failed building dependencies for chart %q: %w", chart, err)
+			}
 		}
 
 		result := action(chart)
@@ -411,7 +438,12 @@ func (t *Testing) LintAndInstallCharts() ([]TestResult, error) {
 
 // PrintResults writes test results to stdout.
 func (t *Testing) PrintResults(results []TestResult) {
-	util.PrintDelimiterLineToWriter(os.Stdout, "-")
+	if !t.config.GithubGroups {
+		fmt.Println()
+		util.PrintDelimiterLineToWriter(os.Stdout, "-")
+	} else {
+		util.GithubGroupsBegin(os.Stdout, "Test Results")
+	}
 	if results != nil {
 		for _, result := range results {
 			err := result.Error
@@ -424,7 +456,11 @@ func (t *Testing) PrintResults(results []TestResult) {
 	} else {
 		fmt.Println("No chart changes detected.")
 	}
-	util.PrintDelimiterLineToWriter(os.Stdout, "-")
+	if !t.config.GithubGroups {
+		util.PrintDelimiterLineToWriter(os.Stdout, "-")
+	} else {
+		util.GithubGroupsEnd(os.Stdout)
+	}
 }
 
 // LintChart lints the specified chart.
@@ -631,7 +667,7 @@ func (t *Testing) doUpgrade(oldChart, newChart *Chart, oldChartMustPass bool) er
 				return nil
 			}
 
-			if err := t.helm.Upgrade(newChart.Path(), namespace, release); err != nil {
+			if err := t.helm.UpgradeWithValues(newChart.Path(), valuesFile, namespace, release); err != nil {
 				return err
 			}
 
@@ -657,14 +693,14 @@ func (t *Testing) testRelease(namespace, release, releaseSelector string) error 
 func (t *Testing) generateInstallConfig(chart *Chart) (namespace, release, releaseSelector string, cleanup func()) {
 	if t.config.Namespace != "" {
 		namespace = t.config.Namespace
-		release, _ = chart.CreateInstallParams(t.config.BuildID)
+		release, _ = chart.CreateInstallParams(t.config.BuildID, t.config.ReleaseName)
 		releaseSelector = fmt.Sprintf("%s=%s", t.config.ReleaseLabel, release)
 		cleanup = func() {
 			t.PrintEventsPodDetailsAndLogs(namespace, releaseSelector)
 			t.helm.DeleteRelease(namespace, release)
 		}
 	} else {
-		release, namespace = chart.CreateInstallParams(t.config.BuildID)
+		release, namespace = chart.CreateInstallParams(t.config.BuildID, t.config.ReleaseName)
 		cleanup = func() {
 			t.PrintEventsPodDetailsAndLogs(namespace, releaseSelector)
 			t.helm.DeleteRelease(namespace, release)
@@ -701,7 +737,13 @@ func (t *Testing) computeMergeBase() (string, error) {
 	if err != nil {
 		return "", errors.New("must be in a git repository")
 	}
-	return t.git.MergeBase(fmt.Sprintf("%s/%s", t.config.Remote, t.config.TargetBranch), t.config.Since)
+
+	branch := fmt.Sprintf("%s/%s", t.config.Remote, t.config.TargetBranch)
+	if !t.git.BranchExists(branch) {
+		return "", fmt.Errorf("targetBranch '%s' does not exist", branch)
+	}
+
+	return t.git.MergeBase(branch, t.config.Since)
 }
 
 // ComputeChangedChartDirectories takes the merge base of HEAD and the configured remote and target branch and computes a
@@ -719,7 +761,7 @@ func (t *Testing) ComputeChangedChartDirectories() ([]string, error) {
 		return nil, fmt.Errorf("failed creating diff: %w", err)
 	}
 
-	var changedChartDirs []string
+	changedChartFiles := map[string][]string{}
 	for _, file := range allChangedChartFiles {
 		pathElements := strings.SplitN(filepath.ToSlash(file), "/", 3)
 		if len(pathElements) < 2 || util.StringSliceContains(cfg.ExcludedCharts, pathElements[1]) {
@@ -736,12 +778,30 @@ func (t *Testing) ComputeChangedChartDirectories() ([]string, error) {
 					continue
 				}
 			}
-			// Only add it if not already in the list
-			if !util.StringSliceContains(changedChartDirs, chartDir) {
-				changedChartDirs = append(changedChartDirs, chartDir)
-			}
+			changedChartFiles[chartDir] = append(changedChartFiles[chartDir], strings.TrimPrefix(file, chartDir+"/"))
 		} else {
 			fmt.Fprintf(os.Stderr, "Directory %q is not a valid chart directory. Skipping...\n", dir)
+		}
+	}
+
+	changedChartDirs := []string{}
+	if t.config.UseHelmignore {
+		for chartDir, changedChartFiles := range changedChartFiles {
+			rules, err := t.loadRules(chartDir)
+			if err != nil {
+				return nil, err
+			}
+			filteredChartFiles, err := ignore.FilterFiles(changedChartFiles, rules)
+			if err != nil {
+				return nil, err
+			}
+			if len(filteredChartFiles) > 0 {
+				changedChartDirs = append(changedChartDirs, chartDir)
+			}
+		}
+	} else {
+		for chartDir := range changedChartFiles {
+			changedChartDirs = append(changedChartDirs, chartDir)
 		}
 	}
 
@@ -874,7 +934,7 @@ func (t *Testing) ValidateMaintainers(chart *Chart) error {
 func (t *Testing) PrintEventsPodDetailsAndLogs(namespace string, selector string) {
 	util.PrintDelimiterLineToWriter(os.Stdout, "=")
 
-	printDetails(namespace, "Events of namespace", ".", func(item string) error {
+	t.printDetails(namespace, "Events of namespace", ".", func(_ string) error {
 		return t.kubectl.GetEvents(namespace)
 	}, namespace)
 
@@ -893,7 +953,7 @@ func (t *Testing) PrintEventsPodDetailsAndLogs(namespace string, selector string
 	}
 
 	for _, pod := range pods {
-		printDetails(pod, "Description of pod", "~", func(item string) error {
+		t.printDetails(pod, "Description of pod", "~", func(_ string) error {
 			return t.kubectl.DescribePod(namespace, pod)
 		}, pod)
 
@@ -904,7 +964,7 @@ func (t *Testing) PrintEventsPodDetailsAndLogs(namespace string, selector string
 		}
 
 		if t.config.PrintLogs {
-			printDetails(pod, "Logs of init container", "-",
+			t.printDetails(pod, "Logs of init container", "-",
 				func(item string) error {
 					return t.kubectl.Logs(namespace, pod, item)
 				}, initContainers...)
@@ -915,7 +975,7 @@ func (t *Testing) PrintEventsPodDetailsAndLogs(namespace string, selector string
 				return
 			}
 
-			printDetails(pod, "Logs of container", "-",
+			t.printDetails(pod, "Logs of container", "-",
 				func(item string) error {
 					return t.kubectl.Logs(namespace, pod, item)
 				},
@@ -926,21 +986,29 @@ func (t *Testing) PrintEventsPodDetailsAndLogs(namespace string, selector string
 	util.PrintDelimiterLineToWriter(os.Stdout, "=")
 }
 
-func printDetails(resource string, text string, delimiterChar string, printFunc func(item string) error, items ...string) {
+func (t *Testing) printDetails(resource string, text string, delimiterChar string, printFunc func(item string) error, items ...string) {
 	for _, item := range items {
 		item = strings.Trim(item, "'")
 
-		util.PrintDelimiterLineToWriter(os.Stdout, delimiterChar)
-		fmt.Printf("==> %s %s\n", text, resource)
-		util.PrintDelimiterLineToWriter(os.Stdout, delimiterChar)
+		if !t.config.GithubGroups {
+			util.PrintDelimiterLineToWriter(os.Stdout, delimiterChar)
+			fmt.Printf("==> %s %s\n", text, resource)
+			util.PrintDelimiterLineToWriter(os.Stdout, delimiterChar)
+		} else {
+			util.GithubGroupsBegin(os.Stdout, fmt.Sprintf("%s %s", text, resource))
+		}
 
 		if err := printFunc(item); err != nil {
 			fmt.Println("Error printing details:", err)
 			return
 		}
 
-		util.PrintDelimiterLineToWriter(os.Stdout, delimiterChar)
-		fmt.Printf("<== %s %s\n", text, resource)
-		util.PrintDelimiterLineToWriter(os.Stdout, delimiterChar)
+		if !t.config.GithubGroups {
+			util.PrintDelimiterLineToWriter(os.Stdout, delimiterChar)
+			fmt.Printf("<== %s %s\n", text, resource)
+			util.PrintDelimiterLineToWriter(os.Stdout, delimiterChar)
+		} else {
+			util.GithubGroupsEnd(os.Stdout)
+		}
 	}
 }

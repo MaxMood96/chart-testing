@@ -40,11 +40,15 @@ ct lint-and-install [flags]
       --exclude-deprecated                   Skip charts that are marked as deprecated
       --excluded-charts strings              Charts that should be skipped. May be specified multiple times
                                              or separate values with commas
+      --github-groups                        Change the delimiters for github to create collapsible groups
+                                             for command output
       --helm-dependency-extra-args strings   Additional arguments for 'helm dependency build' (e.g. ["--skip-refresh"]
       --helm-extra-args string               Additional arguments for Helm. Must be passed as a single quoted string
-                                             (e.g. "--timeout 500s"
+                                             (e.g. '--timeout 500s')
       --helm-extra-set-args string           Additional arguments for Helm. Must be passed as a single quoted string
                                              (e.g. "--set=name=value"
+      --helm-lint-extra-args string          Additional arguments for Helm lint subcommand. Must be passed as a single quoted string
+                                             (e.g. '--quiet')
       --helm-repo-extra-args strings         Additional arguments for the 'helm repo add' command to be
                                              specified on a per-repo basis with an equals sign as delimiter
                                              (e.g. 'myrepo=--username test --password secret'). May be specified
@@ -59,15 +63,19 @@ ct lint-and-install [flags]
                                              expose sensitive data when helm-repo-extra-args contains passwords)
       --release-label string                 The label to be used as a selector when inspecting resources created by charts.
                                              This is only used if namespace is specified (default "app.kubernetes.io/instance")
+      --release-name string                  Name for the release. If not specified, is set to the chart name and a random 
+                                             identifier.
       --remote string                        The name of the Git remote used to identify changed charts (default "origin")
       --since string                         The Git reference used to identify changed charts (default "HEAD")
       --skip-clean-up                        Skip resources clean-up. Used if need to continue other flows or keep it around.
+      --skip-helm-dependencies               Skip running 'helm dependency build' before linting
       --skip-missing-values                  When --upgrade has been passed, this flag will skip testing CI values files from the
                                              previous chart revision if they have been deleted or renamed at the current chart
                                              revision
-      --target-branch string                 The name of the target branch used to identify changed charts (default "master")
+      --target-branch string                 The name of the target branch used to identify changed charts (default "main")
       --upgrade                              Whether to test an in-place upgrade of each chart from its previous revision if the
                                              current version should not introduce a breaking change according to the SemVer spec
+      --use-helmignore                       Use .helmignore when identifying changed charts
       --validate-chart-schema                Enable schema validation of 'Chart.yaml' using Yamale (default true)
       --validate-maintainers                 Enable validation of maintainer account names in chart.yml.
                                              Works for GitHub, GitLab, and Bitbucket (default true)
