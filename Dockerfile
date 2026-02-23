@@ -9,7 +9,8 @@ RUN apk --no-cache add \
     py3-pip \
     py3-wheel \
     python3 \
-    yamllint
+    yamllint \
+    && git config --global --add safe.directory '*'
 
 # Install Yamale YAML schema validator
 ARG yamale_version=6.0.0
