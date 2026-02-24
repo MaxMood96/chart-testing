@@ -11,11 +11,6 @@ RUN apk --no-cache add \
     python3 \
     yamllint
 
-# Allow git to access all directories
-# This is needed because git 2.35.2+ (container is on 2.47+)  will not try to access directories not owned by the user running the container.
-# /workdir is owned by the host user and the container runs as root.
-RUN git config --global --add safe.directory '/workdir'
-
 # Install Yamale YAML schema validator
 ARG yamale_version=6.0.0
 LABEL yamale-version=$yamale_version
@@ -54,5 +49,6 @@ fi \
 COPY ./etc/chart_schema.yaml /etc/ct/chart_schema.yaml
 COPY ./etc/lintconf.yaml /etc/ct/lintconf.yaml
 COPY ct /usr/local/bin/ct
+RUN git config --global --add safe.directory /workdir
 # Ensure that the binary is available on path and is executable
 RUN ct --help
