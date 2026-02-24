@@ -65,7 +65,7 @@ func Execute() {
 func addCommonFlags(flags *pflag.FlagSet) {
 	flags.StringVar(&cfgFile, "config", "", "Config file")
 	flags.String("remote", "origin", "The name of the Git remote used to identify changed charts")
-	flags.String("target-branch", "master", "The name of the target branch used to identify changed charts")
+	flags.String("target-branch", "main", "The name of the target branch used to identify changed charts")
 	flags.String("since", "HEAD", "The Git reference used to identify changed charts")
 	flags.StringSlice("chart-dirs", []string{"charts"}, heredoc.Doc(`
 		Directories containing Helm charts. May be specified multiple times
@@ -77,6 +77,10 @@ func addCommonFlags(flags *pflag.FlagSet) {
 		Prints the configuration to stderr (caution: setting this may
 		expose sensitive data when helm-repo-extra-args contains passwords)`))
 	flags.Bool("exclude-deprecated", false, "Skip charts that are marked as deprecated")
+	flags.Bool("github-groups", false, heredoc.Doc(`
+		Change the delimiters for github to create collapsible groups
+		for command output`))
+	flags.Bool("use-helmignore", false, "Use .helmignore when identifying changed charts")
 }
 
 func addCommonLintAndInstallFlags(flags *pflag.FlagSet) {
@@ -92,6 +96,12 @@ func addCommonLintAndInstallFlags(flags *pflag.FlagSet) {
 		Additional chart repositories for dependency resolutions.
 		Repositories should be formatted as 'name=url' (ex: local=http://127.0.0.1:8879/charts).
 		May be specified multiple times or separate values with commas`))
+	flags.String("helm-extra-args", "", heredoc.Doc(`
+		Additional arguments for Helm. Must be passed as a single quoted string
+		(e.g. '--timeout 500s')`))
+	flags.String("helm-lint-extra-args", "", heredoc.Doc(`
+		Additional arguments for Helm lint subcommand. Must be passed as a single quoted string
+		(e.g. '--quiet')`))
 	flags.StringSlice("helm-repo-extra-args", []string{}, heredoc.Doc(`
 		Additional arguments for the 'helm repo add' command to be
 		specified on a per-repo basis with an equals sign as delimiter

@@ -52,6 +52,7 @@ type Configuration struct {
 	ValidateMaintainers     bool          `mapstructure:"validate-maintainers"`
 	ValidateChartSchema     bool          `mapstructure:"validate-chart-schema"`
 	ValidateYaml            bool          `mapstructure:"validate-yaml"`
+	SkipHelmDependencies    bool          `mapstructure:"skip-helm-dependencies"`
 	AdditionalCommands      []string      `mapstructure:"additional-commands"`
 	CheckVersionIncrement   bool          `mapstructure:"check-version-increment"`
 	ProcessAllCharts        bool          `mapstructure:"all"`
@@ -60,6 +61,8 @@ type Configuration struct {
 	ChartDirs               []string      `mapstructure:"chart-dirs"`
 	ExcludedCharts          []string      `mapstructure:"excluded-charts"`
 	HelmExtraArgs           string        `mapstructure:"helm-extra-args"`
+	HelmExtraSetArgs        string        `mapstructure:"helm-extra-set-args"`
+	HelmLintExtraArgs       string        `mapstructure:"helm-lint-extra-args"`
 	HelmRepoExtraArgs       []string      `mapstructure:"helm-repo-extra-args"`
 	HelmDependencyExtraArgs []string      `mapstructure:"helm-dependency-extra-args"`
 	Debug                   bool          `mapstructure:"debug"`
@@ -67,10 +70,13 @@ type Configuration struct {
 	SkipMissingValues       bool          `mapstructure:"skip-missing-values"`
 	SkipCleanUp             bool          `mapstructure:"skip-clean-up"`
 	Namespace               string        `mapstructure:"namespace"`
+	ReleaseName             string        `mapstructure:"release-name"`
 	ReleaseLabel            string        `mapstructure:"release-label"`
 	ExcludeDeprecated       bool          `mapstructure:"exclude-deprecated"`
 	KubectlTimeout          time.Duration `mapstructure:"kubectl-timeout"`
 	PrintLogs               bool          `mapstructure:"print-logs"`
+	GithubGroups            bool          `mapstructure:"github-groups"`
+	UseHelmignore           bool          `mapstructure:"use-helmignore"`
 }
 
 func LoadConfiguration(cfgFile string, cmd *cobra.Command, printConfig bool) (*Configuration, error) {
@@ -173,9 +179,13 @@ func LoadConfiguration(cfgFile string, cmd *cobra.Command, printConfig bool) (*C
 }
 
 func printCfg(cfg *Configuration) {
-	util.PrintDelimiterLineToWriter(os.Stderr, "-")
-	fmt.Fprintln(os.Stderr, " Configuration")
-	util.PrintDelimiterLineToWriter(os.Stderr, "-")
+	if !cfg.GithubGroups {
+		util.PrintDelimiterLineToWriter(os.Stderr, "-")
+		fmt.Fprintln(os.Stderr, " Configuration")
+		util.PrintDelimiterLineToWriter(os.Stderr, "-")
+	} else {
+		util.GithubGroupsBegin(os.Stderr, "Configuration")
+	}
 
 	e := reflect.ValueOf(cfg).Elem()
 	typeOfCfg := e.Type()
@@ -191,7 +201,11 @@ func printCfg(cfg *Configuration) {
 		fmt.Fprintf(os.Stderr, pattern, typeOfCfg.Field(i).Name, e.Field(i).Interface())
 	}
 
-	util.PrintDelimiterLineToWriter(os.Stderr, "-")
+	if !cfg.GithubGroups {
+		util.PrintDelimiterLineToWriter(os.Stderr, "-")
+	} else {
+		util.GithubGroupsEnd(os.Stderr)
+	}
 }
 
 func findConfigFile(fileName string) (string, error) {

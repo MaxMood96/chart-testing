@@ -19,7 +19,8 @@ chart-dirs:
   - incubator
 excluded-charts:
   - common
-helm-extra-args: --timeout 300
+helm-extra-args: --timeout 300s
+helm-lint-extra-args: --quiet
 upgrade: true
 skip-missing-values: true
 namespace: default
@@ -27,3 +28,4 @@ release-label: release
 exclude-deprecated: true
 kubectl-timeout: 120s
 skip-clean-up: true
+use-helmignore: true

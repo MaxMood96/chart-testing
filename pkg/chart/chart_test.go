@@ -23,23 +23,24 @@ import (
 	"github.com/helm/chart-testing/v3/pkg/util"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	helmignore "helm.sh/helm/v3/pkg/ignore"
 )
 
 type fakeGit struct{}
 
-func (g fakeGit) FileExistsOnBranch(file string, remote string, branch string) bool {
+func (g fakeGit) FileExistsOnBranch(_ string, _ string, _ string) bool {
 	return true
 }
 
-func (g fakeGit) Show(file string, remote string, branch string) (string, error) {
+func (g fakeGit) Show(_ string, _ string, _ string) (string, error) {
 	return "", nil
 }
 
-func (g fakeGit) MergeBase(commit1 string, commit2 string) (string, error) {
+func (g fakeGit) MergeBase(_ string, _ string) (string, error) {
 	return "HEAD", nil
 }
 
-func (g fakeGit) ListChangedFilesInDirs(commit string, dirs ...string) ([]string, error) {
+func (g fakeGit) ListChangedFilesInDirs(_ string, _ ...string) ([]string, error) {
 	return []string{
 		"test_charts/foo/Chart.yaml",
 		"test_charts/bar/Chart.yaml",
@@ -54,15 +55,15 @@ func (g fakeGit) ListChangedFilesInDirs(commit string, dirs ...string) ([]string
 	}, nil
 }
 
-func (g fakeGit) AddWorktree(path string, ref string) error {
+func (g fakeGit) AddWorktree(_ string, _ string) error {
 	return nil
 }
 
-func (g fakeGit) RemoveWorktree(path string) error {
+func (g fakeGit) RemoveWorktree(_ string) error {
 	return nil
 }
 
-func (g fakeGit) GetURLForRemote(remote string) (string, error) {
+func (g fakeGit) GetURLForRemote(_ string) (string, error) {
 	return "git@github.com/helm/chart-testing", nil
 }
 
@@ -70,9 +71,13 @@ func (g fakeGit) ValidateRepository() error {
 	return nil
 }
 
+func (g fakeGit) BranchExists(_ string) bool {
+	return true
+}
+
 type fakeAccountValidator struct{}
 
-func (v fakeAccountValidator) Validate(repoDomain string, account string) error {
+func (v fakeAccountValidator) Validate(_ string, account string) error {
 	if strings.HasPrefix(account, "valid") {
 		return nil
 	}
@@ -96,23 +101,23 @@ type fakeHelm struct {
 	mock.Mock
 }
 
-func (h *fakeHelm) AddRepo(name, url string, extraArgs []string) error { return nil }
-func (h *fakeHelm) BuildDependencies(chart string) error               { return nil }
+func (h *fakeHelm) AddRepo(_, _ string, _ []string) error { return nil }
+func (h *fakeHelm) BuildDependencies(_ string) error      { return nil }
 func (h *fakeHelm) BuildDependenciesWithArgs(chart string, extraArgs []string) error {
 	h.Called(chart, extraArgs)
 	return nil
 }
-func (h *fakeHelm) LintWithValues(chart string, valuesFile string) error { return nil }
-func (h *fakeHelm) InstallWithValues(chart string, valuesFile string, namespace string, release string) error {
+func (h *fakeHelm) LintWithValues(_ string, _ string) error { return nil }
+func (h *fakeHelm) InstallWithValues(_ string, _ string, _ string, _ string) error {
 	return nil
 }
-func (h *fakeHelm) Upgrade(chart string, namespace string, release string) error {
+func (h *fakeHelm) UpgradeWithValues(_ string, _ string, _ string, _ string) error {
 	return nil
 }
-func (h *fakeHelm) Test(namespace string, release string) error {
+func (h *fakeHelm) Test(_ string, _ string) error {
 	return nil
 }
-func (h *fakeHelm) DeleteRelease(namespace string, release string) {}
+func (h *fakeHelm) DeleteRelease(_ string, _ string) {}
 
 func (h *fakeHelm) Version() (string, error) {
 	return "v3.0.0", nil
@@ -148,6 +153,26 @@ func newTestingMock(cfg config.Configuration) Testing {
 		accountValidator: fakeAccountValidator{},
 		linter:           fakeMockLinter,
 		helm:             new(fakeHelm),
+		loadRules: func(dir string) (*helmignore.Rules, error) {
+			rules := helmignore.Empty()
+			if dir == "test_charts/foo" {
+				var err error
+				rules, err = helmignore.Parse(strings.NewReader("Chart.yaml\n"))
+				if err != nil {
+					return nil, err
+				}
+				rules.AddDefaults()
+			}
+			if dir == "test_chart_at_multi_level/foo/baz" {
+				var err error
+				rules, err = helmignore.Parse(strings.NewReader("Chart.yaml\n"))
+				if err != nil {
+					return nil, err
+				}
+				rules.AddDefaults()
+			}
+			return rules, nil
+		},
 	}
 }
 
@@ -159,6 +184,19 @@ func TestComputeChangedChartDirectories(t *testing.T) {
 	}
 	assert.Len(t, actual, 3)
 	assert.Nil(t, err)
+}
+
+func TestComputeChangedChartDirectoriesWithHelmignore(t *testing.T) {
+	cfg := config.Configuration{
+		ExcludedCharts: []string{"excluded"},
+		ChartDirs:      []string{"test_charts", "."},
+		UseHelmignore:  true,
+	}
+	ct := newTestingMock(cfg)
+	actual, err := ct.ComputeChangedChartDirectories()
+	expected := []string{"test_charts/bar", "test_chart_at_root"}
+	assert.Nil(t, err)
+	assert.ElementsMatch(t, expected, actual)
 }
 
 func TestComputeChangedChartDirectoriesWithMultiLevelChart(t *testing.T) {
@@ -174,6 +212,19 @@ func TestComputeChangedChartDirectoriesWithMultiLevelChart(t *testing.T) {
 	}
 	assert.Len(t, actual, 2)
 	assert.Nil(t, err)
+}
+
+func TestComputeChangedChartDirectoriesWithMultiLevelChartWithHelmIgnore(t *testing.T) {
+	cfg := config.Configuration{
+		ExcludedCharts: []string{"excluded"},
+		ChartDirs:      []string{"test_chart_at_multi_level/foo"},
+		UseHelmignore:  true,
+	}
+	ct := newTestingMock(cfg)
+	actual, err := ct.ComputeChangedChartDirectories()
+	expected := []string{"test_chart_at_multi_level/foo/bar"}
+	assert.Nil(t, err)
+	assert.ElementsMatch(t, expected, actual)
 }
 
 func TestReadAllChartDirectories(t *testing.T) {

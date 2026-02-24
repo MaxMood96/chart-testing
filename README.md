@@ -10,9 +10,9 @@ Original README is preserved below.
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Go Report Card](https://goreportcard.com/badge/github.com/helm/chart-testing)](https://goreportcard.com/report/github.com/helm/chart-testing)
-![ci](https://github.com/helm/chart-testing/workflows/ci/badge.svg)
+[![ci](https://github.com/helm/chart-testing/workflows/ci/badge.svg)](https://github.com/helm/chart-testing/actions/workflows/ci.yaml)
 
-`ct` is the the tool for testing Helm charts.
+`ct` is the tool for testing Helm charts.
 It is meant to be used for linting and testing pull requests.
 It automatically detects charts changed against the target branch.
 
@@ -20,7 +20,7 @@ It automatically detects charts changed against the target branch.
 
 ### Prerequisites
 
-It is recommended to use the provided Docker image which can be [found on Quay](https://quay.io/helmpack/chart-testing/).
+It is recommended to use the provided Docker image which can be [found on Quay](https://quay.io/repository/helmpack/chart-testing).
 It comes with all necessary tools installed.
 
 -   [Helm](http://helm.sh)
@@ -101,7 +101,7 @@ If you have a chart in current directory and ct installed on the host then you c
 
 With docker it works with:
 
-    docker run -it --network host --workdir=/data --volume ~/.kube/config:/root/.kube/config:ro --volume $(pwd):/data quay.io/helmpack/chart-testing:v3.7.1 ct install --chart-dirs . --charts .
+    docker run -it --network host --workdir=/data --volume ~/.kube/config:/root/.kube/config:ro --volume $(pwd):/data quay.io/helmpack/chart-testing:v3.14.0 ct install --chart-dirs . --charts .
 
 Notice that `workdir` param is important and must be the same as volume mounted.
 
@@ -136,15 +136,17 @@ Notice that if no config file is specified, then `ct.yaml` (or any of the suppor
 #### Using private chart repositories
 
 When adding chart-repos you can specify additional arguments for the `helm repo add` command using `helm-repo-extra-args` on a per-repo basis.
+You can also specify OCI registries which will be added using the `helm registry login` command, they also support the `helm-repo-extra-args` for authentication.
 This could for example be used to authenticate a private chart repository.
 
 `config.yaml`:
 
 ```yaml
 chart-repos:
-    - incubator=https://incubator.io
-    - basic-auth=https://private.com
-    - ssl-repo=https://self-signed.ca
+  - incubator=https://incubator.io
+  - basic-auth=https://private.com
+  - ssl-repo=https://self-signed.ca
+  - oci-registry=oci://nice-oci-registry.pt
 helm-repo-extra-args:
     - ssl-repo=--ca-file ./my-ca.crt
 ```
@@ -198,7 +200,7 @@ Here's a previous one for reference: https://github.com/helm/chart-testing/pull/
 ### Create Release
 
 The release workflow is [dispatched from github actions](https://github.com/helm/chart-testing/actions)
-Versions must start with a lower-case `v`, e. g. `v3.7.1`.
+Versions must start with a lower-case `v`, e. g. `v3.14.0`.
 
 ## Supported versions
 
