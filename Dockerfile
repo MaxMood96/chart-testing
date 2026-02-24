@@ -14,7 +14,7 @@ RUN apk --no-cache add \
 # Allow git to access all directories
 # This is needed because git 2.35.2+ (container is on 2.47+)  will not try to access directories not owned by the user running the container.
 # /workdir is owned by the host user and the container runs as root.
-RUN git config --global --add safe.directory '*'
+RUN git config --global --add safe.directory '/workdir'
 
 # Install Yamale YAML schema validator
 ARG yamale_version=6.0.0
