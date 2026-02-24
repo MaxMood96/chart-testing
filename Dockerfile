@@ -26,7 +26,7 @@ RUN targetArch=$(echo $TARGETPLATFORM | cut -f2 -d '/') \
 elif [ ${targetArch} = "arm64" ]; then \
     HELM_ARCH="linux/arm64"; \
 fi \
-    && curl -LO "dl.k8s.io/$kubectl_version/bin/$HELM_ARCH/kubectl" \
+    && curl -LO "https://dl.k8s.io/$kubectl_version/bin/$HELM_ARCH/kubectl" \
     && chmod +x kubectl \
     && mv kubectl /usr/local/bin/
 
